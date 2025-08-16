@@ -6,11 +6,12 @@ import { AuthModule } from './modules/auth/auth.module'
 import { DocumentsModule } from './modules/documents/documents.module'
 import { TenantsModule } from './modules/tenants/tenants.module'
 import { DatabaseModule } from './database.module'
-import { APP_INTERCEPTOR } from '@nestjs/core'
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { AuditInterceptor } from './common/audit.interceptor'
 import { RisksModule } from './modules/risks/risks.module'
 import { IncidentsModule } from './modules/incidents/incidents.module'
 import { DashboardModule } from './modules/dashboard/dashboard.module'
+import { RbacGuard } from './common/rbac.guard'
 
 @Module({
 	imports: [
@@ -27,6 +28,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module'
 	providers: [
 		AppService,
 		{ provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+		{ provide: APP_GUARD, useClass: RbacGuard },
 	],
 })
 export class AppModule {}
