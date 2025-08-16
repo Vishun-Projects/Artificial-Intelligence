@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Enable preview features if needed
+// generator client {
+//   provider        = "prisma-client-js"
+//   previewFeatures = ["fullTextSearch"]
+// }
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id            String       @id @default(uuid())
+  name          String       @unique
+  slug          String       @unique
+  isGdprEnabled Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  users         User[]
+  roles         Role[]
+  documents     Document[]
+  risks         Risk[]
+  audits        Audit[]
+  assets        Asset[]
+  incidents     Incident[]
+  vendors       Vendor[]
+  auditLogs     AuditLog[]
+}
+
+model User {
+  id                   String                    @id @default(uuid())
+  email                String                    @unique
+  passwordHash         String
+  fullName             String
+  locale               String                    @default("en-US")
+  isActive             Boolean                   @default(true)
+  mustChangePassword   Boolean                   @default(false)
+  lastLoginAt          DateTime?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  tenantId             String
+  tenant               Tenant                    @relation(fields: [tenantId], references: [id])
+
+  memberships          UserRole[]
+  auditLogs            AuditLog[]
+
+  documentsCreated     Document[]                @relation("DocumentCreatedBy")
+  documentsOwned       Document[]                @relation("DocumentOwner")
+  documentVersionsCreated DocumentVersion[]      @relation("DocumentVersionCreatedBy")
+  documentAcknowledgements DocumentAcknowledgement[] @relation("DocumentAcknowledgementUser")
+  ownedRisks           Risk[]                    @relation("RiskOwner")
+  ownedCapas           Capa[]                    @relation("CapaOwner")
+  ownedAssets          Asset[]                   @relation("AssetOwner")
+}
+
+model Role {
+  id          String      @id @default(uuid())
+  name        String
+  key         String
+  description String?
+
+  tenantId    String
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  permissions Permission[]
+  users       UserRole[]
+
+  @@unique([tenantId, key])
+}
+
+model Permission {
+  id       String   @id @default(uuid())
+  action   String
+  resource String
+  roleId   String
+  role     Role     @relation(fields: [roleId], references: [id])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  timestamp    DateTime @default(now())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  action       String
+  entity       String
+  entityId     String?
+  metadata     String?
+  ipAddress    String?
+}
+
+// Document Control
+model Document {
+  id             String          @id @default(uuid())
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  title          String
+  number         String?
+  status         String          @default("DRAFT")
+  currentVersion Int             @default(1)
+  // tags removed for SQLite compatibility; use a join table later
+  createdById    String
+  createdBy      User            @relation("DocumentCreatedBy", fields: [createdById], references: [id])
+  ownerId        String
+  owner          User            @relation("DocumentOwner", fields: [ownerId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  versions       DocumentVersion[]
+  acknowledgements DocumentAcknowledgement[]
+}
+
+model DocumentVersion {
+  id          String   @id @default(uuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  version     Int
+  contentUrl  String
+  changelog   String?
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("DocumentVersionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([documentId, version])
+}
+
+model DocumentAcknowledgement {
+  id             String   @id @default(uuid())
+  documentId     String
+  document       Document @relation(fields: [documentId], references: [id])
+  userId         String
+  user           User     @relation("DocumentAcknowledgementUser", fields: [userId], references: [id])
+  acknowledgedAt DateTime @default(now())
+
+  @@unique([documentId, userId])
+}
+
+// Risk Management
+model Risk {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  title       String
+  description String?
+  likelihood  Int      @default(1)
+  impact      Int      @default(1)
+  rating      Int      @default(1)
+  ownerId     String
+  owner       User     @relation("RiskOwner", fields: [ownerId], references: [id])
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Internal Audit & CAPA
+model Audit {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  title     String
+  scope     String?
+  status    String   @default("PLANNED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  findings  Finding[]
+}
+
+model Finding {
+  id        String   @id @default(uuid())
+  auditId   String
+  audit     Audit    @relation(fields: [auditId], references: [id])
+  title     String
+  severity  Int      @default(1)
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  capas     Capa[]
+}
+
+model Capa {
+  id        String   @id @default(uuid())
+  findingId String
+  finding   Finding  @relation(fields: [findingId], references: [id])
+  title     String
+  ownerId   String
+  owner     User     @relation("CapaOwner", fields: [ownerId], references: [id])
+  dueDate   DateTime?
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Asset Management
+model Asset {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  name           String
+  type           String
+  ownerId        String
+  owner          User     @relation("AssetOwner", fields: [ownerId], references: [id])
+  classification String   @default("Internal")
+  status         String   @default("in-use")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// Incident Management
+model Incident {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  title       String
+  severity    Int      @default(1)
+  status      String   @default("OPEN")
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Vendor Management
+model Vendor {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  service     String?
+  contractUrl String?
+  riskLevel   Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
