@@ -13,6 +13,7 @@ import { IncidentsModule } from './modules/incidents/incidents.module'
 import { DashboardModule } from './modules/dashboard/dashboard.module'
 import { RbacGuard } from './common/rbac.guard'
 import { StorageModule } from './modules/storage/storage.module'
+import { UsersModule } from './modules/users/users.module'
 
 @Module({
 	imports: [
@@ -25,6 +26,7 @@ import { StorageModule } from './modules/storage/storage.module'
 		IncidentsModule,
 		DashboardModule,
 		StorageModule,
+		UsersModule,
 	],
 	controllers: [AppController],
 	providers: [
