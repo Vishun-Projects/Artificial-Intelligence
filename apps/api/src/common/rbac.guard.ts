@@ -20,7 +20,15 @@ export class RbacGuard implements CanActivate {
 			where: { userId: user.userId },
 			include: { role: { include: { permissions: true } } },
 		})
-		const perms = new Set(roles.flatMap(r => r.role.permissions.map(p => `${p.resource}:${p.action}`)))
-		return required.every(r => perms.has(`${r.resource}:${r.action}`) || perms.has(`*:*`) || perms.has(`${r.resource}:*`) || perms.has(`*:${r.action}`))
+		const perms = new Set<string>(
+			roles.flatMap((r: any) => r.role.permissions.map((p: any) => `${p.resource}:${p.action}`)),
+		)
+		return required.every(
+			(r: RequiredPermission) =>
+				perms.has(`${r.resource}:${r.action}`) ||
+				perms.has(`*:*`) ||
+				perms.has(`${r.resource}:*`) ||
+				perms.has(`*:${r.action}`),
+		)
 	}
 }
